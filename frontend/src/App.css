@@ -1,0 +1,50 @@
+/* ./src/App.css */
+
+.app-container {
+    font-family: sans-serif;
+    text-align: center;
+    padding: 20px;
+}
+
+.train-section,
+.calculate-section {
+    border: 1px solid #ccc;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.training-message {
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+.loading {
+    margin-top: 10px;
+    font-style: italic;
+}
+
+.error {
+    color: red;
+    margin-top: 10px;
+}
+
+input[type="text"],
+input[type="number"] {
+    padding: 8px;
+    margin: 5px;
+    width: 200px;
+}
+
+button {
+    padding: 10px 15px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+button:disabled {
+    background-color: #cccccc;
+    color: #666666;
+    cursor: not-allowed;
+}

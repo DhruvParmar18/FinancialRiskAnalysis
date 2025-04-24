@@ -1,0 +1,33 @@
+version: "3.8"
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api/app:/app  # Mount the api app directory for development
+      - ./training/models:/app/models # Mount the models directory
+    depends_on:
+      - training
+    container_name: api
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    container_name: frontend
+
+  training:
+    build:
+      context: ./training
+      dockerfile: Dockerfile
+    volumes:
+      - ./training:/app # Mount the training directory
+      - ./training/models:/app/models # Mount the models directory
+    container_name: training
