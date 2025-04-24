@@ -4,20 +4,20 @@ import tensorflow as tf
 import numpy as np
 import yfinance as yf
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler  # Import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler
 import joblib
 import os
 from typing import Dict, Any
 
 app = FastAPI()
 
-MODEL_DIR = "/app/models"  # Consistent model directory
+MODEL_DIR = "/app/models"
 
 
 # Import the training script
 try:
     import sys
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'training')))
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "training")))
     import train
 except ImportError as e:
     print(f"Error importing training script: {e}")
@@ -38,6 +38,7 @@ class TrainResponse(BaseModel):
 class PredictionRequest(BaseModel):
     ticker: str
     investment_amount: float
+    simulation_count: int = 1000  # Number of simulation paths
 
 
 class PredictionResponse(BaseModel):
@@ -48,12 +49,10 @@ class PredictionResponse(BaseModel):
 
 
 def compute_var(returns, confidence=0.95):
-    # Directly using the compute_var function from the provided snippet
     return np.percentile(returns, (1 - confidence) * 100)
 
 
 def compute_cvar(returns, confidence=0.95):
-    # Directly using the compute_cvar function from the provided snippet
     var = compute_var(returns, confidence)
     return returns[returns < var].mean()
 
@@ -74,6 +73,7 @@ async def predict(request: PredictionRequest):
     try:
         ticker = request.ticker
         investment_amount = request.investment_amount
+        simulation_count = request.simulation_count  # Get simulation count
 
         model_path = os.path.join(MODEL_DIR, f"{ticker}_lstm_model.h5")
         scaler_path = os.path.join(MODEL_DIR, f"{ticker}_scaler.joblib")
@@ -87,26 +87,25 @@ async def predict(request: PredictionRequest):
 
         # Fetch data
         stock_data = yf.download(ticker, period="max")
-        stock_data['LogReturn'] = np.log(stock_data['Close'] / stock_data['Close'].shift(1))
+        stock_data["LogReturn"] = np.log(stock_data["Close"] / stock_data["Close"].shift(1))
         stock_data = stock_data.dropna()
 
-        # Preprocess data (Crucially, use the SAME scaler!)
-        # Assuming the last 60 log returns are used as input to the model
+        # Prepare input for prediction
         if len(stock_data) < 60:
             raise HTTPException(status_code=400, detail="Not enough historical data to make a prediction.")
-        X = stock_data['LogReturn'].values[-60:].reshape(1, 60, 1)
-        X_scaled = scaler.transform(X.reshape(X.shape[0] * X.shape[1], X.shape[2])).reshape(X.shape)
+        X_last_60_days = stock_data["LogReturn"].values[-60:].reshape(1, 60, 1)
+        X_scaled = scaler.transform(X_last_60_days.reshape(X_last_60_days.shape[0] * X_last_60_days.shape[1], X_last_60_days.shape[2])).reshape(X_last_60_days.shape)
 
-        prediction = model.predict(X_scaled)
+        # Generate simulated returns
+        simulated_returns = []
+        for _ in range(simulation_count):
+            predicted_return = model.predict(X_scaled)[0][0]
+            #   Assuming we use the predicted return directly as a possible future return
+            simulated_returns.append(predicted_return)
 
-        # Invert scaling (if you scaled the target)
-        # Assuming you scaled the target variable (log return) in training
-        prediction_original_scale = scaler.inverse_transform(prediction.reshape(-1, 1))[0][0]
-
-        # Calculate VaR and CVaR using the historical log returns
-        log_returns = stock_data['LogReturn'].dropna()
-        var_percentage = compute_var(log_returns, confidence=0.95)
-        cvar_percentage = compute_cvar(log_returns, confidence=0.95)
+        # Calculate VaR and CVaR from simulated returns
+        var_percentage = compute_var(np.array(simulated_returns), confidence=0.95)
+        cvar_percentage = compute_cvar(np.array(simulated_returns), confidence=0.95)
 
         var_value = investment_amount * var_percentage
         cvar_value = investment_amount * cvar_percentage
