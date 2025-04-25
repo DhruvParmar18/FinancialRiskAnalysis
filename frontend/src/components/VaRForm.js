@@ -6,7 +6,7 @@ function VaRForm({ onCalculate }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onCalculate({ ticker, amount: parseFloat(amount) });
+    onCalculate({ ticker, investment_amount: parseFloat(amount) });
   };
 
   return (

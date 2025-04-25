@@ -7,22 +7,19 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 import joblib
 import os
+from train import train_model, create_features, preprocess_data, fetch_data, fetch_macro_data, macro_indicators, merge_df
 from typing import Dict, Any
+import uvicorn
+import logging
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 app = FastAPI()
 
-MODEL_DIR = "/app/models"
-
-
-# Import the training script
-try:
-    import sys
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "training")))
-    import train
-except ImportError as e:
-    print(f"Error importing training script: {e}")
-    raise
-
+MODEL_DIR = "/usr/src/app/models"
 
 class TrainRequest(BaseModel):
     ticker: str
@@ -59,13 +56,21 @@ def compute_cvar(returns, confidence=0.95):
 
 @app.post("/train/", response_model=TrainResponse)
 async def train_model_endpoint(request: TrainRequest):
+    logger.info("Received training request for %s", request.ticker)
     try:
-        result: Dict[str, Any] = train.train_model(request.ticker)  # Call the training function
+        result: Dict[str, Any] = train_model(request.ticker)
         if "error" in result:
+            logger.error("Training failed for %s: %s", request.ticker, result["error"])
             raise HTTPException(status_code=500, detail=result["error"])
+        logger.info("Training succeeded for %s (model saved to %s)", request.ticker, result["model_path"])
         return TrainResponse(**result)
     except Exception as e:
+        logger.exception("Unhandled exception during training for %s", request.ticker)
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
 
 
 @app.post("/predict/", response_model=PredictionResponse)
@@ -73,39 +78,28 @@ async def predict(request: PredictionRequest):
     try:
         ticker = request.ticker
         investment_amount = request.investment_amount
-        simulation_count = request.simulation_count  # Get simulation count
-
-        model_path = os.path.join(MODEL_DIR, f"{ticker}_lstm_model.h5")
-        scaler_path = os.path.join(MODEL_DIR, f"{ticker}_scaler.joblib")
+        model_path = os.path.join(MODEL_DIR, f"{ticker}_lstm_model.keras")
 
         # Load the trained model and scaler
         try:
             model = tf.keras.models.load_model(model_path)
-            scaler = joblib.load(scaler_path)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error loading model or scaler: {e}")
+            raise HTTPException(status_code=500, detail=f"Error loading model: {e}")
 
         # Fetch data
-        stock_data = yf.download(ticker, period="max")
-        stock_data["LogReturn"] = np.log(stock_data["Close"] / stock_data["Close"].shift(1))
-        stock_data = stock_data.dropna()
+        stock_data = fetch_data([ticker])[ticker]
+        macro_data = fetch_macro_data(macro_indicators)
+        merged_df = merge_df(stock_data, macro_data)
+        full_df = preprocess_data(create_features(merged_df, ticker))
 
         # Prepare input for prediction
-        if len(stock_data) < 60:
-            raise HTTPException(status_code=400, detail="Not enough historical data to make a prediction.")
-        X_last_60_days = stock_data["LogReturn"].values[-60:].reshape(1, 60, 1)
-        X_scaled = scaler.transform(X_last_60_days.reshape(X_last_60_days.shape[0] * X_last_60_days.shape[1], X_last_60_days.shape[2])).reshape(X_last_60_days.shape)
-
-        # Generate simulated returns
-        simulated_returns = []
-        for _ in range(simulation_count):
-            predicted_return = model.predict(X_scaled)[0][0]
-            #   Assuming we use the predicted return directly as a possible future return
-            simulated_returns.append(predicted_return)
+        input_df = full_df.drop(columns=[f'{ticker}_LogReturn'])
+        input_reshaped = np.array(input_df,dtype=np.float32).reshape((input_df.shape[0], input_df.shape[1], 1))
+        pred = model.predict(input_reshaped)
 
         # Calculate VaR and CVaR from simulated returns
-        var_percentage = compute_var(np.array(simulated_returns), confidence=0.95)
-        cvar_percentage = compute_cvar(np.array(simulated_returns), confidence=0.95)
+        var_percentage = compute_var(np.array(pred), confidence=0.95)
+        cvar_percentage = compute_cvar(np.array(pred), confidence=0.95)
 
         var_value = investment_amount * var_percentage
         cvar_value = investment_amount * cvar_percentage
@@ -116,8 +110,9 @@ async def predict(request: PredictionRequest):
             cvar_percentage=float(cvar_percentage),
             cvar_value=float(cvar_value)
         )
-
-    except HTTPException as he:
-        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+if __name__ == "__main__":
+    logger.info("Starting Uvicorn in standalone mode")
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

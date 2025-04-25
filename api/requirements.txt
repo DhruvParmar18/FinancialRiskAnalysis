@@ -6,3 +6,8 @@ pandas
 numpy
 scikit-learn
 joblib
+pandas_datareader
+statsmodels
+scipy
+shap
+keras-tuner

@@ -85,8 +85,8 @@ function App() {
             <div className="calculate-section">
                 <h2>Calculate VaR/CVaR</h2>
                 <VaRForm onCalculate={(data) => {
-                    setAmount(data.amount); // Store the amount
-                    calculateVaR({ ...data, ticker: ticker }); // Use the trained ticker
+                    setAmount(data.investment_amount); // Store the amount
+                    calculateVaR(data);
                 }} />
                 {loading && <div className="loading">Calculating...</div>}
                 {error && <div className="error">Error: {error}</div>}
