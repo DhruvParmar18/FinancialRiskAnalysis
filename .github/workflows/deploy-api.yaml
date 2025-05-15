@@ -18,11 +18,11 @@ jobs:
     - name: Login to ACR
       uses: azure/docker-login@v1
       with:
-        login-server: ${{ secrets.ACR_LOGIN_SERVER }}
-        username: ${{ secrets.ACR_USERNAME }}
-        password: ${{ secrets.ACR_PASSWORD }}
+        login-server: ${{ secrets.ACR_API_LOGIN_SERVER }}
+        username: ${{ secrets.ACR_API_USERNAME }}
+        password: ${{ secrets.ACR_API_PASSWORD }}
 
     - name: Build and Push API Docker image
       run: |
-        docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/api:latest ./api
-        docker push ${{ secrets.ACR_LOGIN_SERVER }}/api:latest
+        docker build -t ${{ secrets.ACR_API_LOGIN_SERVER }}/api:latest ./api
+        docker push ${{ secrets.ACR_API_LOGIN_SERVER }}/api:latest
