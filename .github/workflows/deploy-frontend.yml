@@ -11,6 +11,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: Prod
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
@@ -18,11 +19,11 @@ jobs:
     - name: Login to ACR
       uses: azure/docker-login@v1
       with:
-        login-server: ${{ secrets.ACR_LOGIN_SERVER }}
-        username: ${{ secrets.ACR_USERNAME }}
-        password: ${{ secrets.ACR_PASSWORD }}
+        login-server: ${{ secrets.ACR_FRONT_LOGIN_SERVER }}
+        username: ${{ secrets.ACR_FRONT_USERNAME }}
+        password: ${{ secrets.ACR_FRONT_PASSWORD }}
 
-    - name: Build and Push Frontend Docker image
+    - name: Build and Push API Docker image
       run: |
-        docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/frontend:latest ./frontend
-        docker push ${{ secrets.ACR_LOGIN_SERVER }}/frontend:latest
+        docker build -t ${{ secrets.ACR_FRONT_LOGIN_SERVER }}/api:latest ./api
+        docker push ${{ secrets.ACR_FRONT_LOGIN_SERVER }}/api:latest
