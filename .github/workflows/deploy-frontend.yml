@@ -25,5 +25,5 @@ jobs:
 
     - name: Build and Push API Docker image
       run: |
-        docker build -t ${{ secrets.ACR_FRONT_LOGIN_SERVER }}/api:latest ./api
-        docker push ${{ secrets.ACR_FRONT_LOGIN_SERVER }}/api:latest
+        docker build -t ${{ secrets.ACR_FRONT_LOGIN_SERVER }}/frontend:latest ./frontend
+        docker push ${{ secrets.ACR_FRONT_LOGIN_SERVER }}/frontend:latest
