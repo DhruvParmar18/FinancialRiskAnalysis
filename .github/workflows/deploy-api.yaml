@@ -6,7 +6,7 @@ on:
       - 'api/**'
       - '.github/workflows/deploy-api.yml'
     branches:
-      - main
+      - master
 
 jobs:
   deploy:

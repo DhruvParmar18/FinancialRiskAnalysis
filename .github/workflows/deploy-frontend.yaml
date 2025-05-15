@@ -6,7 +6,7 @@ on:
       - 'frontend/**'
       - '.github/workflows/deploy-frontend.yml'
     branches:
-      - main
+      - master
 
 jobs:
   deploy:
